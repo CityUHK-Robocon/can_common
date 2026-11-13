@@ -95,7 +95,7 @@ typedef union {
         {
             if (pos < 0 || pos > 63) return 0;
             int bitFieldIdx = pos / 8;
-            return (bitField[bitFieldIdx] >> pos) & 1;
+            return (bitField[bitFieldIdx] >> (pos & 7)) & 1;
         }
         BitRef operator[]( int pos )
         {
@@ -122,7 +122,7 @@ typedef union {
         {
             if (pos < 0 || pos > 511) return 0; //64 8 bit bytes is 512 bits, we start counting bits at 0
             int bitfieldIdx = pos / 8;
-            return (bitField[bitfieldIdx] >> pos) & 1;
+            return (bitField[bitfieldIdx] >> (pos & 7)) & 1;
         }
         BitRef operator[]( int pos )
         {
