@@ -1,7 +1,7 @@
 #include <can_common.h>
 
 /* Reference from kernel header minmax.h __clamp*/
-#define clamp(val, lo, hi)	\
+#define CAN_CLAMP(val, lo, hi)	\
 		((val) >= (hi) ? (hi) : ((val) <= (lo) ? (lo) : (val)))
 
 //CAN FD only allows discrete frame lengths after the normal CAN 8 byte limit. They are encoded below
@@ -108,7 +108,7 @@ and they've got blank or very simple implementations below.
 CAN_COMMON::CAN_COMMON(int numFilt)
 {
     //clamp so mailbox bounds checks can never index past the callback arrays
-	numFilters = clamp(numFilt, 0, CAN_MAX_FILTERS);
+	numFilters = CAN_CLAMP(numFilt, 0, CAN_MAX_FILTERS);
 
     memset(cbCANFrame, 0, sizeof(cbCANFrame));
 	memset(cbCANFrameFD, 0, sizeof(cbCANFrameFD));
