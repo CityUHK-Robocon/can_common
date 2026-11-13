@@ -26,6 +26,7 @@
 
 
 #define SIZE_LISTENERS	4 //number of classes that can register as listeners with this class
+#define CAN_MAX_FILTERS	32 //size of the per-mailbox callback arrays
 #define CAN_DEFAULT_BAUD	500000
 #define CAN_DEFAULT_FD_RATE 4000000
 
@@ -94,7 +95,7 @@ typedef union {
         {
             if (pos < 0 || pos > 63) return 0;
             int bitFieldIdx = pos / 8;
-            return (bitField[bitFieldIdx] >> pos) & 1;
+            return (bitField[bitFieldIdx] >> (pos & 7)) & 1;
         }
         BitRef operator[]( int pos )
         {
@@ -121,7 +122,7 @@ typedef union {
         {
             if (pos < 0 || pos > 511) return 0; //64 8 bit bytes is 512 bits, we start counting bits at 0
             int bitfieldIdx = pos / 8;
-            return (bitField[bitfieldIdx] >> pos) & 1;
+            return (bitField[bitfieldIdx] >> (pos & 7)) & 1;
         }
         BitRef operator[]( int pos )
         {
@@ -262,9 +263,9 @@ public:
 protected:
 	CANListener *listener[SIZE_LISTENERS];
     void (*cbGeneral)(CAN_FRAME *); //general callback if no per-mailbox or per-filter entries matched
-    void (*cbCANFrame[32])(CAN_FRAME *); //array of function pointers - disgusting syntax though.
+    void (*cbCANFrame[CAN_MAX_FILTERS])(CAN_FRAME *); //array of function pointers - disgusting syntax though.
     void (*cbGeneralFD)(CAN_FRAME_FD *); //general callback if no per-mailbox or per-filter entries matched - FD version
-    void (*cbCANFrameFD[32])(CAN_FRAME_FD *); //array of function pointers - disgusting syntax though - FD version
+    void (*cbCANFrameFD[CAN_MAX_FILTERS])(CAN_FRAME_FD *); //array of function pointers - disgusting syntax though - FD version
     uint32_t busSpeed;
     uint32_t fd_DataSpeed;
     int numFilters;

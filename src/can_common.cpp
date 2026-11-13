@@ -103,9 +103,12 @@ and they've got blank or very simple implementations below.
 
 CAN_COMMON::CAN_COMMON(int numFilt)
 {
+    //clamp so mailbox bounds checks can never index past the callback arrays
     numFilters = numFilt;
-    memset(cbCANFrame, 0, 4 * numFilters);
-	memset(cbCANFrameFD, 0, 4 * numFilters);
+    if (numFilters < 0) numFilters = 0;
+    if (numFilters > CAN_MAX_FILTERS) numFilters = CAN_MAX_FILTERS;
+    memset(cbCANFrame, 0, sizeof(cbCANFrame));
+	memset(cbCANFrameFD, 0, sizeof(cbCANFrameFD));
 
     cbGeneral = NULL;
 	cbGeneralFD = NULL;
@@ -350,48 +353,39 @@ int CAN_COMMON::watchFor(uint32_t id, uint32_t mask)
 	else return setRXFilter(id, mask, false);
 }
 
+//Fully explicit version - needed for extended IDs at or below 0x7FF
+int CAN_COMMON::watchFor(uint32_t id, uint32_t mask, bool ext)
+{
+	return setRXFilter(id, mask, ext);
+}
+
 //A bit more complicated. Makes sure that the range from id1 to id2 is let through. This might open
 //the floodgates if you aren't careful.
-//There are undoubtedly better ways to calculate the proper values for the filter but this way seems to work.
-//It'll be kind of slow if you try to let a huge span through though.
 int CAN_COMMON::watchForRange(uint32_t id1, uint32_t id2)
 {
-	uint32_t id = 0;
-	uint32_t mask = 0;
-	uint32_t temp;
-
-	if (id1 > id2) 
-	{   //looks funny I know. In place swap with no temporary storage. Neato!
-		id1 = id1 ^ id2;
-		id2 = id1 ^ id2; //note difference here.
-		id1 = id1 ^ id2;
-	}
-
-	id = id1;
-
-	if (id2 <= 0x7FF) mask = 0x7FF;
-	else mask = 0x1FFFFFFF;
-
-	/* Here is a quick overview of the theory behind these calculations.
-	   We start with mask set to 11 or 29 set bits (all 1's)
-	   and id set to the lowest ID in the range.
-	   From there we go through every single ID possible in the range. For each ID
-	   we AND with the current ID. At the end only bits that never changed and were 1's
-	   will still be 1's. This yields the ID we can match against to let these frames through
-	   The mask is calculated by finding the bitfield difference between the lowest ID and
-	   the current ID. This calculation will be 1 anywhere the bits were different. We invert
-	   this so that it is 1 anywhere the bits where the same. Then we AND with the current Mask.
-	   At the end the mask will be 1 anywhere the bits never changed. This is the perfect mask.
-	*/
-	for (uint32_t c = id1; c <= id2; c++)
+	if (id1 > id2)
 	{
-		id &= c;
-		temp = (~(id1 ^ c)) & 0x1FFFFFFF;
-		mask &= temp;
+		uint32_t temp = id1;
+		id1 = id2;
+		id2 = temp;
 	}
-	//output of the above crazy loop is actually the end result.
-	if (id > 0x7FF) return setRXFilter(id, mask, true);
-	else return setRXFilter(id, mask, false);
+
+	//the range is extended if its top end doesn't fit in 11 bits
+	bool ext = id2 > 0x7FF;
+	uint32_t mask = ext ? 0x1FFFFFFF : 0x7FF;
+
+	//Every bit from the highest one where id1 and id2 differ on down takes both
+	//values somewhere in the range, so those bits can't be matched. Everything above
+	//never changes. Smear the highest differing bit downward to get the "don't care" bits.
+	uint32_t vary = id1 ^ id2;
+	vary |= vary >> 1;
+	vary |= vary >> 2;
+	vary |= vary >> 4;
+	vary |= vary >> 8;
+	vary |= vary >> 16;
+
+	mask &= ~vary;
+	return setRXFilter(id1 & mask, mask, ext);
 }
 
 //these next few functions would normally be pure abstract but they're implemented here
